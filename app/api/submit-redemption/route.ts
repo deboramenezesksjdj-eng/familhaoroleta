@@ -1,54 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import fs from 'fs/promises'
-import path from 'path'
-
-// Caminho para o arquivo de dados
-const dataFilePath = path.join(process.cwd(), 'data', 'redemptions.json')
-
-// Função para ler os dados do arquivo
-async function readData() {
-  try {
-    const data = await fs.readFile(dataFilePath, 'utf8')
-    return JSON.parse(data)
-  } catch (error) {
-    // Se o arquivo não existir, retorna array vazio
-    return []
-  }
-}
-
-// Função para escrever os dados no arquivo
-async function writeData(data: any[]) {
-  // Garantir que o diretório exista
-  await fs.mkdir(path.dirname(dataFilePath), { recursive: true })
-  await fs.writeFile(dataFilePath, JSON.stringify(data, null, 2))
-}
+import { supabase, REDEMPTIONS_TABLE } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
-    
-    // Extrair todos os campos do formulário
+
     const values: any = {}
     for (const [key, value] of formData.entries()) {
       values[key] = value
     }
-    
+
     // Adicionar timestamp
     values.timestamp = new Date().toISOString()
-    
-    // Ler dados existentes
-    let submissions = await readData()
-    
-    // Salvar no arquivo de dados
-    submissions.push(values)
-    
-    // Escrever os dados atualizados
-    await writeData(submissions)
-    
-    console.log('Nova submissão recebida:', values)
-    
-    return NextResponse.json({ success: true, protocolo: values.protocolo })
+
+    // Campos usados pelo painel administrativo
+    values.protocolo = values.protocolo || `RG-${Date.now().toString(36).toUpperCase()}`
+    values.premio = values.premio || 'R$ 50.000'
+    values.status = values.status || 'pendente'
+    values.data = values.data || new Date().toLocaleDateString('pt-BR')
+    values.hora = values.hora || new Date().toLocaleTimeString('pt-BR')
+
+    const { data, error } = await supabase
+      .from(REDEMPTIONS_TABLE)
+      .insert(values)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    console.log('Nova submissão recebida:', data)
+
+    return NextResponse.json({ success: true, protocolo: data.protocolo, id: data.id })
   } catch (error) {
     console.error('Erro ao processar submissão:', error)
     return NextResponse.json({ success: false, error: 'Erro ao processar a solicitação' }, { status: 500 })
@@ -58,8 +40,14 @@ export async function POST(request: NextRequest) {
 // Endpoint para obter todas as submissões
 export async function GET() {
   try {
-    const submissions = await readData()
-    return NextResponse.json(submissions)
+    const { data, error } = await supabase
+      .from(REDEMPTIONS_TABLE)
+      .select('*')
+      .order('id', { ascending: false })
+
+    if (error) throw error
+
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Erro ao buscar submissões:', error)
     return NextResponse.json({ error: 'Erro ao buscar as solicitações' }, { status: 500 })
@@ -70,26 +58,45 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const { id, ...updateData } = await request.json()
-    
-    // Ler dados existentes
-    let submissions = await readData()
-    
-    // Encontrar e atualizar a submissão específica
-    const submissionIndex = submissions.findIndex((sub: any) => sub.id === id)
-    
-    if (submissionIndex !== -1) {
-      // Atualizar os dados da submissão
-      submissions[submissionIndex] = { ...submissions[submissionIndex], ...updateData }
-      
-      // Escrever os dados atualizados
-      await writeData(submissions)
-      
-      return NextResponse.json({ success: true, submission: submissions[submissionIndex] })
+
+    const { data, error } = await supabase
+      .from(REDEMPTIONS_TABLE)
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Submissão não encontrada' }, { status: 404 })
     }
-    
-    return NextResponse.json({ success: false, error: 'Submissão não encontrada' }, { status: 404 })
+
+    return NextResponse.json({ success: true, submission: data })
   } catch (error) {
     console.error('Erro ao atualizar submissão:', error)
     return NextResponse.json({ success: false, error: 'Erro ao atualizar a solicitação' }, { status: 500 })
+  }
+}
+
+// Endpoint para excluir uma submissão
+export async function DELETE(request: NextRequest) {
+  try {
+    const id = new URL(request.url).searchParams.get('id')
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID não informado' }, { status: 400 })
+    }
+
+    const { error } = await supabase
+      .from(REDEMPTIONS_TABLE)
+      .delete()
+      .eq('id', id)
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Erro ao excluir submissão:', error)
+    return NextResponse.json({ success: false, error: 'Erro ao excluir a solicitação' }, { status: 500 })
   }
 }

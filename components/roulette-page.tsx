@@ -155,7 +155,7 @@ export function RoulettePage() {
 
       {result && !redeeming && <div role="dialog" aria-live="polite" className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-primary/70 p-4 backdrop-blur-sm"><div className="my-auto max-h-[92vh] w-full max-w-md overflow-y-auto rounded-[2rem] border-4 border-accent bg-card p-6 text-center shadow-2xl md:p-8"><div className="mx-auto mb-5 flex size-16 items-center justify-center rounded-full bg-accent text-primary"><Trophy size={32} /></div><p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-primary/60">{result === 'Gire de novo' ? 'Mais uma chance' : 'Resultado da roleta'}</p><h2 className="mt-2 font-sans text-4xl font-black text-primary">{result}</h2><p className="mt-3 text-foreground/65">{result === 'Gire de novo' ? 'Você ainda tem uma rodada grátis disponível.' : 'Parabéns! Você chegou ao resultado final da sua rodada.'}</p>{result === 'R$ 50.000' && <button type="button" onClick={() => setRedeeming(true)} className="mt-7 w-full rounded-full bg-accent px-7 py-3.5 font-sans font-black text-primary shadow-[0_5px_0_var(--color-primary)]">Resgatar prêmio de R$ 50 mil</button>}<button onClick={() => setResult(null)} className="mt-4 rounded-full bg-primary px-7 py-3 font-sans font-black text-accent">Continuar</button></div></div>}
 
-      {redeeming && <RedemptionForm onClose={() => setRedeeming(false)} />}
+      {redeeming && <RedemptionForm onClose={() => setRedeeming(false)} premio={result ?? 'R$ 50.000'} />}
     </main>
   )
 }

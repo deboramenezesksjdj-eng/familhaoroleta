@@ -64,19 +64,47 @@ export default function AdminPanel() {
   }, [])
 
   const filteredRedemptions = redemptions.filter(redemption => {
-    const matchesSearch = 
-      redemption.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      redemption.cpf.includes(searchTerm) ||
-      redemption.whatsapp.includes(searchTerm)
-    
+    const term = searchTerm.toLowerCase()
+    const nome = String(redemption.nome ?? '').toLowerCase()
+    const cpf = String(redemption.cpf ?? '')
+    const whatsapp = String(redemption.whatsapp ?? '')
+
+    const matchesSearch =
+      nome.includes(term) ||
+      cpf.includes(searchTerm) ||
+      whatsapp.includes(searchTerm)
+
     const matchesStatus = selectedStatus === 'all' || redemption.status === selectedStatus
-    
+
     return matchesSearch && matchesStatus
   })
 
   const handleExport = () => {
-    // In a real implementation, this would export the data
-    alert('Dados exportados com sucesso!')
+    const headers = ['id', 'nome', 'cpf', 'whatsapp', 'endereco', 'banco', 'agencia', 'conta', 'premio', 'data', 'hora', 'status']
+    const rows = filteredRedemptions.map(redemption =>
+      [
+        redemption.id,
+        redemption.nome,
+        redemption.cpf,
+        redemption.whatsapp,
+        redemption.endereco,
+        redemption.banco,
+        redemption.agencia,
+        redemption.conta,
+        redemption.premio,
+        redemption.data,
+        redemption.hora,
+        redemption.status
+      ].map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';')
+    )
+    const csv = [headers.join(';'), ...rows].join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `resgates-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
   }
 
   const getStatusColor = (status: string) => {
@@ -128,6 +156,55 @@ export default function AdminPanel() {
   const handleCancelEdit = () => {
     setEditingId(null)
     setEditValue('')
+  }
+
+  const handleStatusChange = async (id: number, status: string) => {
+    try {
+      const response = await fetch('/api/submit-redemption', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, status })
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao atualizar status')
+      }
+
+      setRedemptions(redemptions.map(redemption =>
+        redemption.id === id ? { ...redemption, status } : redemption
+      ))
+      if (showDetails?.id === id) {
+        setShowDetails({ ...showDetails, status })
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error)
+      alert('Erro ao atualizar status')
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Excluir esta solicitação? Essa ação não pode ser desfeita.')) {
+      return
+    }
+    try {
+      const response = await fetch(`/api/submit-redemption?id=${id}`, {
+        method: 'DELETE'
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir')
+      }
+
+      setRedemptions(redemptions.filter(redemption => redemption.id !== id))
+      if (showDetails?.id === id) {
+        setShowDetails(null)
+      }
+    } catch (error) {
+      console.error('Erro ao excluir solicitação:', error)
+      alert('Erro ao excluir solicitação')
+    }
   }
 
   if (loading) {
@@ -293,15 +370,19 @@ export default function AdminPanel() {
                       {redemption.premio}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {redemption.data}
+                      {redemption.data || (redemption.timestamp ? new Date(redemption.timestamp).toLocaleString('pt-BR') : '-')}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(redemption.status)}`}>
-                        {redemption.status === 'pendente' && 'Pendente'}
-                        {redemption.status === 'processando' && 'Processando'}
-                        {redemption.status === 'concluido' && 'Concluído'}
-                        {redemption.status === 'cancelado' && 'Cancelado'}
-                      </span>
+                      <select
+                        value={redemption.status ?? 'pendente'}
+                        onChange={(e) => handleStatusChange(redemption.id, e.target.value)}
+                        className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none ${getStatusColor(redemption.status)}`}
+                      >
+                        <option value="pendente">Pendente</option>
+                        <option value="processando">Processando</option>
+                        <option value="concluido">Concluído</option>
+                        <option value="cancelado">Cancelado</option>
+                      </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <button 
@@ -333,7 +414,10 @@ export default function AdminPanel() {
                           Editar
                         </button>
                       )}
-                      <button className="text-red-600 hover:text-red-900">
+                      <button
+                        onClick={() => handleDelete(redemption.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
                         Excluir
                       </button>
                     </td>
@@ -392,19 +476,26 @@ export default function AdminPanel() {
                 
                 <div>
                   <h4 className="font-medium text-gray-900">Data</h4>
-                  <p className="text-sm text-gray-500">{showDetails.data}</p>
+                  <p className="text-sm text-gray-500">{showDetails.data || (showDetails.timestamp ? new Date(showDetails.timestamp).toLocaleString('pt-BR') : '-')}</p>
                 </div>
               </div>
               
-              <div className="mt-6 flex justify-end space-x-3">
+              <div className="mt-6 flex justify-end items-center space-x-3">
+                <select
+                  value={showDetails.status ?? 'pendente'}
+                  onChange={(e) => handleStatusChange(showDetails.id, e.target.value)}
+                  className={`px-3 py-2 rounded-md text-sm font-semibold border-0 cursor-pointer focus:ring-2 focus:ring-blue-500 focus:outline-none ${getStatusColor(showDetails.status)}`}
+                >
+                  <option value="pendente">Pendente</option>
+                  <option value="processando">Processando</option>
+                  <option value="concluido">Concluído</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
                 <button 
                   onClick={() => setShowDetails(null)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                 >
                   Fechar
-                </button>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
-                  Atualizar Status
                 </button>
               </div>
             </div>

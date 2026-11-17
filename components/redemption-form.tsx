@@ -33,9 +33,11 @@ const initialValues = {
 
 type Values = typeof initialValues
 
-export function RedemptionForm({ onClose }: { onClose: () => void }) {
+export function RedemptionForm({ onClose, premio = 'R$ 50.000' }: { onClose: () => void; premio?: string }) {
   const [values, setValues] = useState<Values>(initialValues)
   const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   function update(field: keyof Values, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
@@ -66,9 +68,35 @@ export function RedemptionForm({ onClose }: { onClose: () => void }) {
         ) : (
           <form
             className="mt-5 flex flex-col gap-3.5"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault()
-              setSubmitted(true)
+              if (submitting) return
+              setSubmitting(true)
+              setSubmitError(null)
+              try {
+                const formData = new FormData()
+                formData.append('nome', values.nome)
+                formData.append('cpf', values.cpf)
+                formData.append('whatsapp', values.whatsapp)
+                formData.append('endereco', values.endereco)
+                formData.append('banco', values.banco)
+                formData.append('agencia', values.agencia)
+                formData.append('conta', values.conta)
+                formData.append('premio', premio)
+
+                const response = await fetch('/api/submit-redemption', {
+                  method: 'POST',
+                  body: formData,
+                })
+                if (!response.ok) {
+                  throw new Error('Erro ao enviar dados')
+                }
+                setSubmitted(true)
+              } catch {
+                setSubmitError('Não foi possível enviar seus dados. Verifique sua conexão e tente novamente.')
+              } finally {
+                setSubmitting(false)
+              }
             }}
           >
             <div className="flex flex-col gap-1.5">
@@ -112,11 +140,13 @@ export function RedemptionForm({ onClose }: { onClose: () => void }) {
 
             <div className="mt-4 p-3 bg-primary/10 rounded-lg">
               <p className="font-bold">Prêmio:</p>
-              <p>{values.premio}</p>
+              <p>{premio}</p>
             </div>
 
-            <button type="submit" className="mt-1 w-full rounded-full bg-accent px-6 py-3.5 font-sans text-sm font-black uppercase tracking-wide text-primary shadow-[0_5px_0_var(--color-primary)] transition-transform hover:-translate-y-0.5">
-              Concluir resgate
+            {submitError && <p className="rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">{submitError}</p>}
+
+            <button type="submit" disabled={submitting} className="mt-1 w-full rounded-full bg-accent px-6 py-3.5 font-sans text-sm font-black uppercase tracking-wide text-primary shadow-[0_5px_0_var(--color-primary)] transition-transform hover:-translate-y-0.5 disabled:opacity-60">
+              {submitting ? 'Enviando...' : 'Concluir resgate'}
             </button>
           </form>
         )}

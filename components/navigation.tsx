@@ -1,32 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-
-  useEffect(() => {
-    // Check authentication status on client side
-    const checkAuthStatus = () => {
-      if (typeof window !== 'undefined') {
-        // Check for cookie instead of localStorage (consistent with login page)
-        const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-        const loggedInCookie = cookies.find(cookie => cookie.startsWith('adminLoggedIn='));
-        setIsLoggedIn(!!loggedInCookie && loggedInCookie.split('=')[1] === 'true');
-      }
-    }
-
-    checkAuthStatus()
-    // Listen for storage events in case auth state changes in other tabs
-    window.addEventListener('storage', checkAuthStatus)
-
-    return () => {
-      window.removeEventListener('storage', checkAuthStatus)
-    }
-  }, [])
 
   return (
     <header className="bg-background border-b border-primary/10">
@@ -43,11 +21,6 @@ export function Navigation() {
           </nav>
           
           <div className="flex items-center space-x-4">
-            {isLoggedIn && (
-              <Button asChild variant="ghost" size="sm" className="hidden md:block">
-                <Link href="/painel">Painel Admin</Link>
-              </Button>
-            )}
           </div>
         </div>
         
@@ -58,9 +31,6 @@ export function Navigation() {
               <Link href="/#como-jogar" className="text-primary/60 hover:text-primary transition-colors">Como Jogar</Link>
               <Link href="/#premios" className="text-primary/60 hover:text-primary transition-colors">Prêmios</Link>
               <Link href="/#faq" className="text-primary/60 hover:text-primary transition-colors">FAQ</Link>
-              {isLoggedIn && (
-                <Link href="/painel" className="text-primary/60 hover:text-primary transition-colors">Painel Admin</Link>
-              )}
             </div>
           </div>
         )}
