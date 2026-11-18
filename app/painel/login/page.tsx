@@ -9,19 +9,30 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (password === 'Rajada01') {
-      // Store login state with cookie
-      setCookie(null, 'adminLoggedIn', 'true', {
-        maxAge: 30 * 24 * 60 * 60, // 30 days
-        sameSite: true,
-        path: '/',
+
+    try {
+      const response = await fetch('/api/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
       })
-      router.push('/painel')
-    } else {
-      setError('Senha incorreta!')
+      const result = await response.json()
+
+      if (result.success) {
+        // Store login state with cookie
+        setCookie(null, 'adminLoggedIn', 'true', {
+          maxAge: 30 * 24 * 60 * 60, // 30 days
+          sameSite: true,
+          path: '/',
+        })
+        router.push('/painel')
+      } else {
+        setError('Senha incorreta!')
+      }
+    } catch {
+      setError('Erro ao validar senha. Tente novamente.')
     }
   }
 
