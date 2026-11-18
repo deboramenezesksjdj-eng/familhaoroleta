@@ -3,14 +3,19 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { setCookie } from 'nookies'
+import { Lock } from 'lucide-react'
 
 export default function AdminLogin() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return
+    setLoading(true)
+    setError('')
 
     try {
       const response = await fetch('/api/admin-login', {
@@ -21,7 +26,6 @@ export default function AdminLogin() {
       const result = await response.json()
 
       if (result.success) {
-        // Store login state with cookie
         setCookie(null, 'adminLoggedIn', 'true', {
           maxAge: 30 * 24 * 60 * 60, // 30 days
           sameSite: true,
@@ -33,49 +37,52 @@ export default function AdminLogin() {
       }
     } catch {
       setError('Erro ao validar senha. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-sm p-8 max-w-md w-full">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-[1.75rem] border-4 border-accent bg-card p-8 text-primary shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Painel Administrativo</h1>
-          <p className="mt-2 text-gray-600">Entre com sua senha para acessar</p>
+          <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-full bg-accent text-primary">
+            <Lock size={26} />
+          </div>
+          <h1 className="font-sans text-3xl font-black text-primary">Painel Administrativo</h1>
+          <p className="mt-2 text-sm text-primary/60">Entre com sua senha para acessar</p>
         </div>
-        
+
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+          <div className="mb-4 rounded-lg bg-red-100 p-3 text-center text-sm font-bold text-red-700">
             {error}
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit}>
           <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="password" className="mb-1.5 block font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-primary/60">
               Senha de Acesso
             </label>
             <input
               id="password"
               type="password"
+              autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-xl border-2 border-primary/15 bg-background/5 px-3 py-2.5 font-sans text-sm text-primary outline-none transition-colors placeholder:text-primary/35 focus:border-primary/60"
               placeholder="Digite a senha de acesso"
             />
           </div>
-          
+
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={loading}
+            className="w-full rounded-full bg-accent px-6 py-3.5 font-sans text-sm font-black uppercase tracking-wide text-primary shadow-[0_5px_0_var(--color-primary)] transition-transform hover:-translate-y-0.5 disabled:opacity-60"
           >
-            Acessar Painel
+            {loading ? 'Validando...' : 'Acessar painel'}
           </button>
         </form>
-        
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Senha padrão: Rajada01</p>
-        </div>
       </div>
     </div>
   )
